@@ -1,0 +1,2 @@
+probleme between geopandas et sqlalchemy 2.0
+--> sqlalchemy 1.4
