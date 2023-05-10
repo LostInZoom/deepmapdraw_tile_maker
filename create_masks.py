@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 
 ### DEF
 
-def create_mask(extent, polygons, zoom, img_size, img_path=False, verbose=False):
+def create_mask(extent, polygons, zoom, img_size, img_path, verbose=False, empty=True):
     '''
     Create an image from an extent and draw black polygons on it 
 
@@ -28,11 +28,15 @@ def create_mask(extent, polygons, zoom, img_size, img_path=False, verbose=False)
         
     verbose : bool, optional
         Print information in prompt. The default is False.
+        
+    empty : bool, optional
+        create masks even if it is empty. The default is True.
 
     Returns
     -------
     mask : PIL image
         Return the created mask
+        Return False if the empty mask is not created.
 
     '''
 
@@ -51,66 +55,66 @@ def create_mask(extent, polygons, zoom, img_size, img_path=False, verbose=False)
     
     if verbose: print("Number of polygons created through intersection: ", len(intersections))
     
+    # if there are no polygons to draw
+    if not intersections and empty == False: 
+        if verbose: print("Empty mask is not created")
+        return False
+    
+    
+    # if there are polygons to draw
     
     # Creation of an empty mask (blank image)
     mask = Image.new(mode='LA', size=img_size, color='white')
+        
+    # simplify multipolygons
+    p = []
+    for geometry in intersections:
+        if geometry.geom_type == 'Polygon': p.append(geometry)
+        if geometry.geom_type == 'MultiPolygon':
+            for poly in geometry.geoms: p.append(poly)
     
-    if intersections:
-        
-        # simplify multipolygons
-        p = []
-        for geometry in intersections:
-            if geometry.geom_type == 'Polygon': p.append(geometry)
-            if geometry.geom_type == 'MultiPolygon':
-                for poly in geometry.geoms: p.append(poly)
-        
-        intersections = p
-        
-        
-        # Create one image per polygon and fuse them later (mandatory to take into account overlapping polygons with at least one hole)
-        if verbose: print("Drawing polygon images...")
-        images = []
-        for polygon in intersections:
-            
-            # creation of an image with PIL
-            img = Image.new(mode='LA', size=img_size, color=(0, 0)) # LA --> color = (black/white, alpha (transparency))
-            draw = ImageDraw.Draw(img)
-            
-            # Conversion des points du polygone depuis son échelle et son emprise. à une nouvelle échelle et coordonnées d'origine 256*256
-            poly_to_draw = affinity.translate(polygon, xoff=-w, yoff=-s)
-            poly_to_draw = affinity.scale(poly_to_draw,
-                                                 xfact=1/zoom,
-                                                 yfact=1/zoom,
-                                                 origin=(0, 0))
-            
-            # Draw exterior polygon in black
-            coords_list = poly_to_draw.exterior.coords
-            draw.polygon(coords_list, fill="black") # black = (0, 255)
-            
-            # Draw interior polygons (holes) in transparent
-            int_polys = poly_to_draw.interiors
-            for poly in int_polys:
-                coords_list = poly.coords
-                draw.polygon(coords_list, fill=(0, 0))
-                
-            images.append(img)
-                
-        if verbose: print("Fusing polygon images")
-        
-        # Fuse images with mask
-        for img in images:
-            mask.paste(img, mask=img)
-        
-        # flip mask because PIL 'y' are inverted
-        mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
+    intersections = p
     
+    # Create one image per polygon and fuse them later (mandatory to take into account overlapping polygons with at least one hole)
+    if verbose: print("Drawing polygon images...")
+    images = []
+    for polygon in intersections:
+        
+        # creation of an image with PIL
+        img = Image.new(mode='LA', size=img_size, color=(0, 0)) # LA --> color = (black/white, alpha (transparency))
+        draw = ImageDraw.Draw(img)
+        
+        # Conversion des points du polygone depuis son échelle et son emprise. à une nouvelle échelle et coordonnées d'origine 256*256
+        poly_to_draw = affinity.translate(polygon, xoff=-w, yoff=-s)
+        poly_to_draw = affinity.scale(poly_to_draw,
+                                             xfact=1/zoom,
+                                             yfact=1/zoom,
+                                             origin=(0, 0))
+        
+        # Draw exterior polygon in black
+        coords_list = poly_to_draw.exterior.coords
+        draw.polygon(coords_list, fill="black") # black = (0, 255)
+        
+        # Draw interior polygons (holes) in transparent
+        int_polys = poly_to_draw.interiors
+        for poly in int_polys:
+            coords_list = poly.coords
+            draw.polygon(coords_list, fill=(0, 0))
+            
+        images.append(img)
+            
+    if verbose: print("Fusing polygon images")
     
-    if verbose: print("Mask created")
+    # Fuse images with mask
+    for img in images:
+        mask.paste(img, mask=img)
+    
+    # flip mask because PIL 'y' are inverted
+    mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
 
-    # Save image if needed                  
-    if img_path: 
-        mask.save(img_path)
-        if verbose: print("Mask saved as " + img_path)
+    # Save image                 
+    mask.save(img_path)
+    if verbose: print("Mask saved as " + img_path)
     
     return mask
     
@@ -118,7 +122,7 @@ def create_mask(extent, polygons, zoom, img_size, img_path=False, verbose=False)
 
 
 ################## TESTS ##################
-if __name__ == "main":
+if __name__ == "__main__":
     
     ### PARAMS
     ZOOM_RES_3857 = {          
@@ -138,12 +142,12 @@ if __name__ == "main":
     EXTENT = (144000, 6115000, 154000, 6125000)
 
     # import data as gdf from shp (or from db)
-    gdf = gpd.read_file("tests create masks/test.shp")
+    gdf = gpd.read_file("tests/create masks/test.shp")
     POLYGONS = gdf.geometry.to_crs(3857)
 
     IMG_SIZE = (256, 256)
 
-    IMG_PATH = 'test.png'
+    IMG_PATH = 'tests/create masks/test.png'
     
     ### EXECUTE
-    create_mask(EXTENT, POLYGONS, ZOOM, IMG_SIZE, IMG_PATH)
+    create_mask(EXTENT, POLYGONS, ZOOM, IMG_SIZE, IMG_PATH, verbose=True)

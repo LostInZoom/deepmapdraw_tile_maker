@@ -39,7 +39,7 @@ ZOOM_RES_3857 = {
 
 # Database parameters
 SRS = ZOOM_RES_3857
-ZOOM_LEVEL = 16
+ZOOM_LEVEL = 14
 ZOOM = SRS[ZOOM_LEVEL]
 BASEMAP = 'pign'
 
@@ -53,10 +53,11 @@ WMS_LAYER = 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2'
 TIMEOUT = 300
 
 # Mesh parameters (tiles creation)
-TILE_SIZE = (256, 256)
-OVERLAPSE = 0.5 # between 0 and 0.99
-SAFETY = 0.05
+TILE_SIZE = (512, 512)
+OVERLAPSE = 0.7 # between 0 and 0.99
+SAFETY = 0
 
+EMPTY_MASKS = False
 
 
 ### PATHS 
@@ -67,7 +68,9 @@ PROJECTS_FOLDER = 'projects/'
 
 #INPUT_MASK_PATH = 'anchors_pign_z12.shp' # automatic
 
-PROJECT_PATH = PROJECTS_FOLDER + BASEMAP + '_z' + str(ZOOM_LEVEL) + '_s' + str(TILE_SIZE[0]) + '_ol' + str(int(OVERLAPSE*100)) + '/'
+#PROJECT_PATH = PROJECTS_FOLDER + BASEMAP + '_z' + str(ZOOM_LEVEL) + '_s' + str(TILE_SIZE[0]) + '_ol' + str(int(OVERLAPSE*100)) + '/'
+PROJECT_PATH = PROJECTS_FOLDER + 'pign_z14_s512_ol70_noempty/'
+
 # Extents
 ANCHORS_SHP_PATH = PROJECT_PATH + 'shp/anchors_' + BASEMAP + '_z' + str(ZOOM_LEVEL) + '.shp'
 SET_EXTENTS_SHP_PATH = PROJECT_PATH + 'shp/set_extents_' + BASEMAP + '_z' + str(ZOOM_LEVEL) + '.shp'
@@ -83,6 +86,7 @@ def main():
     
     # Create project folders if it does not exist --> write a function
     # project folder, shp folder
+    
     
     
     ### EXTENTS
@@ -119,6 +123,7 @@ def main():
     print(len(tile_extents), " extents loaded")
         
     
+    
     ### LOAD ANCHORS AND SIMPLIFY MULTIPOLYGONS
     
     # Load anchors polygons (and multipolygons) from db
@@ -143,6 +148,10 @@ def main():
     print(len(polygons), "polygons loaded")
     
     
+    
+    ### IMAGES AND MASKS CREATION
+    
+     
     # Connexion to WMS server (image creation)
     print("Connexion to wms server...")
     wms = WebMapService(WMS_URL, timeout=TIMEOUT)
@@ -150,13 +159,19 @@ def main():
     else: print("Connected to " + WMS_URL) 
     
     
-    ### IMAGES AND MASKS CREATION
-    
+    # Loop
     i = 0
     for tile_extent in tile_extents:
         i += 1
         
         print("Creation of image and mask number ", i, " out of ", len(tile_extents))
+        
+        ### Create mask
+        path = OUTPUT_TARGET_PATH + '/' + str(i) + '_mask.png'
+        mask = create_mask(tile_extent, polygons, ZOOM, TILE_SIZE, img_path=path, verbose=False, empty=EMPTY_MASKS)
+        
+        # if mask is False it means it wasn't created, thus we don't create the corresponding image
+        if not mask : continue
         
         ### Create image
         img = wms.getmap(   layers = [WMS_LAYER],
@@ -171,10 +186,4 @@ def main():
         out.write(img.read())
         out.close()
         
-        
-        ### Create mask
-        path = OUTPUT_TARGET_PATH + '/' + str(i) + '_mask.png'
-        create_mask(tile_extent, polygons, ZOOM, TILE_SIZE, img_path=path, verbose=False)
-
-    
     return print("Job is done")

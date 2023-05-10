@@ -91,14 +91,26 @@ def create_mesh_extents(canvas_extent, overlapse, safety, size, srs, zoom_level,
     # Creation des extents de chaque maille
     extents = []
     
-    for x in range(nb_tiles_width):
-        for y in range(nb_tiles_heigth):
+    # On parcourt la map de gauche à droite puis de haut en bas
+    for y in range(nb_tiles_heigth):
+        for x in range(nb_tiles_width):
             w = wc + (safety * canvas_width) + x * tile_width * (1 - overlapse)
-            s = sc + (safety * canvas_heigth) + y * tile_heigth * (1 - overlapse)
+            n = nc - (safety * canvas_heigth) - y * tile_heigth * (1 - overlapse)
             e = w + tile_width
-            n = s + tile_heigth
+            s = n - tile_heigth
             extent = [w, s, e, n]
             extents.append(extent)
+     
+    ### old tiles de bas en haut puis de gauche à droite
+    # for x in range(nb_tiles_width):
+    #     for y in range(nb_tiles_heigth):
+    #         w = wc + (safety * canvas_width) + x * tile_width * (1 - overlapse)
+    #         s = sc + (safety * canvas_heigth) + y * tile_heigth * (1 - overlapse)
+    #         e = w + tile_width
+    #         n = s + tile_heigth
+    #         extent = [w, s, e, n]
+    #         extents.append(extent)        
+            
     
     if verbose: print("mesh terminé.")
     if verbose: print(nb_tiles_width * nb_tiles_heigth, "tuiles")
